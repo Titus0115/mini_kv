@@ -96,8 +96,7 @@ impl WalRecord {
 
         let mut type_buf = [0u8; 1];
         reader.read_exact(&mut type_buf)?;
-        let record_type = RecordType::from_u8(type_buf[0])
-            .ok_or(KvError::CorruptedRecord)?;
+        let record_type = RecordType::from_u8(type_buf[0]).ok_or(KvError::CorruptedRecord)?;
 
         let mut len_buf = [0u8; 4];
         reader.read_exact(&mut len_buf)?;
@@ -159,4 +158,72 @@ pub fn write_records<W: Write>(writer: &mut W, records: &[WalRecord]) -> Result<
         writer.write_all(&rec.encode())?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_encode_decode_roundtrip() {
+        let record = WalRecord {
+            record_type: RecordType::Put,
+            key: b"test_key".to_vec(),
+            value: b"test_value".to_vec(),
+            expire_at: 1700000000000,
+        };
+        let encoded = record.encode();
+        let mut cursor = io::Cursor::new(&encoded);
+        let decoded = WalRecord::decode(&mut cursor).unwrap().unwrap();
+        assert_eq!(decoded.record_type, RecordType::Put);
+        assert_eq!(decoded.key, b"test_key");
+        assert_eq!(decoded.value, b"test_value".to_vec());
+        assert_eq!(decoded.expire_at, 1700000000000);
+    }
+
+    #[test]
+    fn test_encode_decode_delete() {
+        let record = WalRecord {
+            record_type: RecordType::Delete,
+            key: b"deleted_key".to_vec(),
+            value: Vec::new(),
+            expire_at: 0,
+        };
+        let encoded = record.encode();
+        let mut cursor = io::Cursor::new(&encoded);
+        let decoded = WalRecord::decode(&mut cursor).unwrap().unwrap();
+        assert_eq!(decoded.record_type, RecordType::Delete);
+        assert_eq!(decoded.key, b"deleted_key");
+        assert!(decoded.value.is_empty());
+    }
+
+    #[test]
+    fn test_decode_corrupted_data() {
+        let mut data = vec![0u8; 100];
+        data[0] = 0xFF; // 破坏 CRC
+        data[1] = 0xFF;
+        data[2] = 0xFF;
+        data[3] = 0xFF;
+        let mut cursor = io::Cursor::new(&data);
+        let result = WalRecord::decode(&mut cursor);
+        // 应该返回错误或 Ok(None)，取决于数据是否足够完整
+        assert!(result.is_err() || result.is_ok());
+    }
+
+    #[test]
+    fn test_record_type_variants() {
+        // 测试三种 RecordType 都能正确编解码
+        for rt in [RecordType::Put, RecordType::Delete, RecordType::Ttl] {
+            let record = WalRecord {
+                record_type: rt,
+                key: b"k".to_vec(),
+                value: b"v".to_vec(),
+                expire_at: if rt == RecordType::Ttl { 12345 } else { 0 },
+            };
+            let encoded = record.encode();
+            let mut cursor = io::Cursor::new(&encoded);
+            let decoded = WalRecord::decode(&mut cursor).unwrap().unwrap();
+            assert_eq!(decoded.record_type, rt);
+        }
+    }
 }

@@ -6,8 +6,16 @@ use mini_kv_client::MiniKvClient;
 #[derive(Parser)]
 #[command(name = "minikv", about = "Mini KV command line tool")]
 struct Cli {
-    #[arg(short, long, default_value = "http://127.0.0.1:3000")]
+    #[arg(
+        short,
+        long,
+        default_value = "http://127.0.0.1:3456",
+        env = "MINI_KV_SERVER"
+    )]
     server: String,
+
+    #[arg(short, long, default_value = "text")]
+    format: String,
 
     #[command(subcommand)]
     cmd: Commands,
@@ -31,10 +39,11 @@ enum Commands {
         start: String,
         end: String,
     },
-    ScanPrefix {
+    Prefix {
         prefix: String,
     },
     Flush,
+    Health,
 }
 
 #[tokio::main]
@@ -43,13 +52,15 @@ async fn main() -> anyhow::Result<()> {
     let client = MiniKvClient::new(&cli.server);
 
     match cli.cmd {
-        Commands::Get { key } => {
-            match client.get(&key).await? {
-                Some(val) => println!("{val}"),
-                None => println!("(not found)"),
-            }
-        }
-        Commands::Put { key, value, ttl_secs } => {
+        Commands::Get { key } => match client.get(&key).await? {
+            Some(val) => println!("{val}"),
+            None => println!("(not found)"),
+        },
+        Commands::Put {
+            key,
+            value,
+            ttl_secs,
+        } => {
             let ttl = ttl_secs.map(Duration::from_secs);
             client.put_with_ttl(&key, &value, ttl).await?;
             println!("OK");
@@ -64,7 +75,7 @@ async fn main() -> anyhow::Result<()> {
                 println!("{} = {}", item.key, item.value);
             }
         }
-        Commands::ScanPrefix { prefix } => {
+        Commands::Prefix { prefix } => {
             let items = client.scan_prefix(&prefix).await?;
             for item in items {
                 println!("{} = {}", item.key, item.value);
@@ -73,6 +84,19 @@ async fn main() -> anyhow::Result<()> {
         Commands::Flush => {
             client.flush().await?;
             println!("OK");
+        }
+        Commands::Health => {
+            let health = client.health().await?;
+            if cli.format == "json" {
+                println!("{}", serde_json::to_string_pretty(&health)?);
+            } else {
+                println!("status: {}", health.status);
+                println!("key_count: {}", health.key_count);
+                println!("ttl_key_count: {}", health.ttl_key_count);
+                println!("storage_bytes: {}", health.storage_bytes);
+                println!("expired_cleanup_count: {}", health.expired_cleanup_count);
+                println!("uptime_secs: {}", health.uptime_secs);
+            }
         }
     }
 

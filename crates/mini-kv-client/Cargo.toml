@@ -8,3 +8,4 @@ mini-kv-core = { path = "../mini-kv-core" }
 reqwest = { version = "0.12", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
+urlencoding = "2"

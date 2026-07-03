@@ -33,6 +33,16 @@ pub struct KvPair {
     pub value: String,
 }
 
+#[derive(Deserialize, Serialize)]
+pub struct HealthResponse {
+    pub status: String,
+    pub key_count: usize,
+    pub ttl_key_count: usize,
+    pub storage_bytes: u64,
+    pub expired_cleanup_count: u64,
+    pub uptime_secs: u64,
+}
+
 #[derive(Serialize)]
 struct PutRequest {
     value: String,
@@ -54,7 +64,7 @@ impl MiniKvClient {
     }
 
     pub async fn get(&self, key: &str) -> Result<Option<String>> {
-        let url = format!("{}/kv/{key}", self.base_url);
+        let url = format!("{}/kv/{}", self.base_url, urlencoding::encode(key));
         let resp = self.client.get(&url).send().await?;
         if resp.status().is_success() {
             let body: GetResponse = resp.json().await?;
@@ -70,7 +80,7 @@ impl MiniKvClient {
     }
 
     pub async fn put_with_ttl(&self, key: &str, value: &str, ttl: Option<Duration>) -> Result<()> {
-        let url = format!("{}/kv/{key}", self.base_url);
+        let url = format!("{}/kv/{}", self.base_url, urlencoding::encode(key));
         let body = PutRequest {
             value: value.to_string(),
             ttl_secs: ttl.map(|d| d.as_secs()),
@@ -85,7 +95,7 @@ impl MiniKvClient {
     }
 
     pub async fn delete(&self, key: &str) -> Result<()> {
-        let url = format!("{}/kv/{key}", self.base_url);
+        let url = format!("{}/kv/{}", self.base_url, urlencoding::encode(key));
         let resp = self.client.delete(&url).send().await?;
         if resp.status().is_success() {
             Ok(())
@@ -96,7 +106,12 @@ impl MiniKvClient {
     }
 
     pub async fn scan(&self, start: &str, end: &str) -> Result<Vec<KvPair>> {
-        let url = format!("{}/scan?start={start}&end={end}", self.base_url);
+        let url = format!(
+            "{}/kv?start={}&end={}",
+            self.base_url,
+            urlencoding::encode(start),
+            urlencoding::encode(end)
+        );
         let resp = self.client.get(&url).send().await?;
         if resp.status().is_success() {
             let body: ScanResponse = resp.json().await?;
@@ -108,11 +123,27 @@ impl MiniKvClient {
     }
 
     pub async fn scan_prefix(&self, prefix: &str) -> Result<Vec<KvPair>> {
-        let url = format!("{}/scan-prefix?prefix={prefix}", self.base_url);
+        let url = format!(
+            "{}/kv/prefix?prefix={}",
+            self.base_url,
+            urlencoding::encode(prefix)
+        );
         let resp = self.client.get(&url).send().await?;
         if resp.status().is_success() {
             let body: ScanResponse = resp.json().await?;
             Ok(body.items)
+        } else {
+            let err: ErrorResponse = resp.json().await?;
+            Err(ClientError::Server(err.error))
+        }
+    }
+
+    pub async fn health(&self) -> Result<HealthResponse> {
+        let url = format!("{}/health", self.base_url);
+        let resp = self.client.get(&url).send().await?;
+        if resp.status().is_success() {
+            let body: HealthResponse = resp.json().await?;
+            Ok(body)
         } else {
             let err: ErrorResponse = resp.json().await?;
             Err(ClientError::Server(err.error))

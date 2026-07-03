@@ -18,5 +18,6 @@ Thumbs.db
 
 # Project specific
 /data/
+/dist/
 *.log
 *.log.tmp
