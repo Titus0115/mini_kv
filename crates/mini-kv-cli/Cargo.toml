@@ -1,0 +1,11 @@
+[package]
+name = "mini-kv-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+mini-kv-core = { path = "../mini-kv-core" }
+mini-kv-client = { path = "../mini-kv-client" }
+clap = { version = "4", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"

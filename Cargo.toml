@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "crates/mini-kv-core",
+    "crates/mini-kv-server",
+    "crates/mini-kv-client",
+    "crates/mini-kv-cli",
+]
+resolver = "2"

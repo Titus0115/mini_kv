@@ -1,0 +1,10 @@
+[package]
+name = "mini-kv-client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+mini-kv-core = { path = "../mini-kv-core" }
+reqwest = { version = "0.12", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
