@@ -96,7 +96,8 @@ impl WalRecord {
 
         let mut type_buf = [0u8; 1];
         reader.read_exact(&mut type_buf)?;
-        let record_type = RecordType::from_u8(type_buf[0]).ok_or(KvError::CorruptedRecord)?;
+        let record_type = RecordType::from_u8(type_buf[0])
+            .ok_or(KvError::CorruptedRecord)?;
 
         let mut len_buf = [0u8; 4];
         reader.read_exact(&mut len_buf)?;

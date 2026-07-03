@@ -6,12 +6,7 @@ use mini_kv_client::MiniKvClient;
 #[derive(Parser)]
 #[command(name = "minikv", about = "Mini KV command line tool")]
 struct Cli {
-    #[arg(
-        short,
-        long,
-        default_value = "http://127.0.0.1:3456",
-        env = "MINI_KV_SERVER"
-    )]
+    #[arg(short, long, default_value = "http://127.0.0.1:3456", env = "MINI_KV_SERVER")]
     server: String,
 
     #[arg(short, long, default_value = "text")]
@@ -52,15 +47,13 @@ async fn main() -> anyhow::Result<()> {
     let client = MiniKvClient::new(&cli.server);
 
     match cli.cmd {
-        Commands::Get { key } => match client.get(&key).await? {
-            Some(val) => println!("{val}"),
-            None => println!("(not found)"),
-        },
-        Commands::Put {
-            key,
-            value,
-            ttl_secs,
-        } => {
+        Commands::Get { key } => {
+            match client.get(&key).await? {
+                Some(val) => println!("{val}"),
+                None => println!("(not found)"),
+            }
+        }
+        Commands::Put { key, value, ttl_secs } => {
             let ttl = ttl_secs.map(Duration::from_secs);
             client.put_with_ttl(&key, &value, ttl).await?;
             println!("OK");

@@ -102,8 +102,7 @@ impl WalEngine {
         f.write_all(&data)?;
         f.flush()?;
         f.sync_all()?;
-        self.wal_size
-            .fetch_add(data.len() as u64, Ordering::Relaxed);
+        self.wal_size.fetch_add(data.len() as u64, Ordering::Relaxed);
         Ok(())
     }
 
@@ -164,7 +163,9 @@ impl WalEngine {
         self.reopen_wal_file()?;
 
         let mut memtable = self.memtable.write();
-        memtable.retain(|_, entry| entry.value.is_some() && !entry.is_expired());
+        memtable.retain(|_, entry| {
+            entry.value.is_some() && !entry.is_expired()
+        });
 
         Ok(())
     }
@@ -174,8 +175,7 @@ impl WalEngine {
         let before = memtable.len();
         memtable.retain(|_, entry| !entry.is_expired());
         let purged = before - memtable.len();
-        self.cleanup_count
-            .fetch_add(purged as u64, Ordering::Relaxed);
+        self.cleanup_count.fetch_add(purged as u64, Ordering::Relaxed);
         purged
     }
 
@@ -188,10 +188,7 @@ impl WalEngine {
     /// 返回当前带 TTL 的 key 数量（不含已过期）
     pub fn ttl_key_count(&self) -> usize {
         let table = self.memtable.read();
-        table
-            .iter()
-            .filter(|(_, e)| e.expire_at != 0 && !e.is_expired())
-            .count()
+        table.iter().filter(|(_, e)| e.expire_at != 0 && !e.is_expired()).count()
     }
 
     /// 返回 WAL 文件大小（字节）
@@ -423,9 +420,7 @@ mod tests {
         {
             let engine = WalEngine::open(&path).unwrap();
             engine.put(b"perm", b"keeps").unwrap();
-            engine
-                .put_with_ttl(b"expiring", b"gone", Duration::from_secs(1))
-                .unwrap();
+            engine.put_with_ttl(b"expiring", b"gone", Duration::from_secs(1)).unwrap();
         }
 
         std::thread::sleep(Duration::from_secs(2));
@@ -467,9 +462,7 @@ mod tests {
         let engine = WalEngine::open(dir.path()).unwrap();
 
         engine.put(b"stay", b"here").unwrap();
-        engine
-            .put_with_ttl(b"go", b"away", Duration::from_millis(100))
-            .unwrap();
+        engine.put_with_ttl(b"go", b"away", Duration::from_millis(100)).unwrap();
 
         std::thread::sleep(Duration::from_millis(200));
         let purged = engine.purge_expired();
